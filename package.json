@@ -1,0 +1,19 @@
+{
+  "name": "@mengelbart/moqjs",
+  "version": "0.0.1",
+  "description": "TypeScript implementation of the Media over QUIC (MoQ) transport protocol.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/mengelbart/moqjs.git"
+  },
+  "author": "Mathis Engelbart <mathis.engelbart@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mengelbart/moqjs/issues"
+  },
+  "homepage": "https://github.com/mengelbart/moqjs#readme"
+}
