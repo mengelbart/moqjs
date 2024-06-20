@@ -3,14 +3,16 @@ import type { varint } from "./varint";
 import type { MessageEncoder } from "./messages";
 
 export class Encoder {
-  
   writer: WritableStream<Uint8Array>;
 
   constructor(stream: WritableStream<Uint8Array>) {
     this.writer = stream;
   }
 
-  async write(chunk: MessageEncoder, _: WritableStreamDefaultController): Promise<void> {
+  async write(
+    chunk: MessageEncoder,
+    _: WritableStreamDefaultController,
+  ): Promise<void> {
     await chunk.encode(this);
   }
 

@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/mengelbart/moqjs/issues"
   },
-  "homepage": "https://github.com/mengelbart/moqjs#readme"
+  "homepage": "https://github.com/mengelbart/moqjs#readme",
+  "devDependencies": {
+    "prettier": "^3.3.2"
+  }
 }
