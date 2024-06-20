@@ -37,7 +37,7 @@ export enum MessageType {
   AnnounceCancel = 0x11,
 }
 
-export type Message = 
+export type Message =
   | ObjectStream
   | Subscribe
   | SubscribeOk
@@ -52,11 +52,15 @@ export type Message =
   | GoAway
   | ClientSetup
   | ServerSetup
-  | StreamHeaderTrack 
+  | StreamHeaderTrack
   | StreamHeaderGroup;
 
 export interface ObjectStream {
-  type: MessageType.ObjectStream | MessageType.ObjectDatagram | MessageType.StreamHeaderTrack | MessageType.StreamHeaderGroup;
+  type:
+    | MessageType.ObjectStream
+    | MessageType.ObjectDatagram
+    | MessageType.StreamHeaderTrack
+    | MessageType.StreamHeaderGroup;
   subscribeId: varint;
   trackAlias: varint;
   groupId: varint;
@@ -65,7 +69,7 @@ export interface ObjectStream {
   objectPayload: Uint8Array;
 }
 
-export interface ObjectStreamEncoder extends ObjectStream {};
+export interface ObjectStreamEncoder extends ObjectStream {}
 
 export class ObjectStreamEncoder implements ObjectStream, MessageEncoder {
   constructor(m: ObjectStream) {
@@ -73,7 +77,7 @@ export class ObjectStreamEncoder implements ObjectStream, MessageEncoder {
   }
 
   async encode(_: Encoder): Promise<void> {
-    throw Error('not implemented');
+    throw Error("not implemented");
   }
 }
 
@@ -90,7 +94,7 @@ export interface Subscribe {
   trackRequestParameters: Parameter[];
 }
 
-export interface SubscribeEncoder extends Subscribe {};
+export interface SubscribeEncoder extends Subscribe {}
 
 export class SubscribeEncoder implements Subscribe, MessageEncoder {
   constructor(m: Subscribe) {
@@ -123,7 +127,7 @@ export interface SubscribeOk {
   largestObjectID?: varint;
 }
 
-export interface SubscribeOkEncoder extends SubscribeOk {};
+export interface SubscribeOkEncoder extends SubscribeOk {}
 
 export class SubscribeOkEncoder implements SubscribeOk, MessageEncoder {
   constructor(m: SubscribeOk) {
@@ -150,7 +154,7 @@ export interface SubscribeError {
   trackAlias: varint;
 }
 
-export interface SubscribeErrorEncoder extends SubscribeError {};
+export interface SubscribeErrorEncoder extends SubscribeError {}
 
 export class SubscribeErrorEncoder implements SubscribeError, MessageEncoder {
   constructor(m: SubscribeError) {
@@ -171,7 +175,7 @@ export interface Unsubscribe {
   subscribeId: varint;
 }
 
-export interface UnsubscribeEncoder extends Unsubscribe {};
+export interface UnsubscribeEncoder extends Unsubscribe {}
 
 export class UnsubscribeEncoder implements Unsubscribe, MessageEncoder {
   constructor(m: Unsubscribe) {
@@ -194,7 +198,7 @@ export interface SubscribeDone {
   finalObject: varint;
 }
 
-export interface SubscribeDoneEncoder extends SubscribeDone {};
+export interface SubscribeDoneEncoder extends SubscribeDone {}
 
 export class SubscribeDoneEncoder implements SubscribeDone, MessageEncoder {
   constructor(m: SubscribeDone) {
@@ -220,7 +224,7 @@ export interface Announce {
   parameters: Parameter[];
 }
 
-export interface AnnounceEncoder extends Announce {};
+export interface AnnounceEncoder extends Announce {}
 
 export class AnnounceEncoder implements Announce, MessageEncoder {
   constructor(m: Announce) {
@@ -242,7 +246,7 @@ export interface AnnounceOk {
   trackNamespace: string;
 }
 
-export interface AnnounceOkEncoder extends AnnounceOk {};
+export interface AnnounceOkEncoder extends AnnounceOk {}
 
 export class AnnounceOkEncoder implements AnnounceOk, MessageEncoder {
   constructor(m: AnnounceOk) {
@@ -262,7 +266,7 @@ export interface AnnounceError {
   reasonPhrase: string;
 }
 
-export interface AnnounceErrorEncoder extends AnnounceError {};
+export interface AnnounceErrorEncoder extends AnnounceError {}
 
 export class AnnounceErrorEncoder implements AnnounceError, MessageEncoder {
   constructor(m: AnnounceError) {
@@ -282,7 +286,7 @@ export interface Unannounce {
   trackNamespace: string;
 }
 
-export interface UnannounceEncoder extends Unannounce {};
+export interface UnannounceEncoder extends Unannounce {}
 
 export class UnannounceEncoder implements Unannounce, MessageEncoder {
   constructor(m: Unannounce) {
@@ -304,7 +308,7 @@ export interface GoAway {
   newSessionURI: string;
 }
 
-export interface GoAwayEncoder extends GoAway {};
+export interface GoAwayEncoder extends GoAway {}
 
 export class GoAwayEncoder implements GoAway, MessageEncoder {
   constructor(m: GoAway) {
@@ -323,7 +327,7 @@ export interface ClientSetup {
   parameters: Parameter[];
 }
 
-export interface ClientSetupEncoder extends ClientSetup {};
+export interface ClientSetupEncoder extends ClientSetup {}
 
 export class ClientSetupEncoder implements ClientSetup, MessageEncoder {
   constructor(cs: ClientSetup) {
@@ -349,7 +353,7 @@ export interface ServerSetup {
   parameters: Parameter[];
 }
 
-export interface ServerSetupEncoder extends ServerSetup {};
+export interface ServerSetupEncoder extends ServerSetup {}
 
 export class ServerSetupEncoder implements ServerSetup {
   constructor(m: ServerSetup) {
@@ -364,9 +368,11 @@ export interface StreamHeaderTrack {
   objectSendOrder: varint;
 }
 
-export interface StreamHeaderTrackEncoder extends StreamHeaderTrack {};
+export interface StreamHeaderTrackEncoder extends StreamHeaderTrack {}
 
-export class StreamHeaderTrackEncoder implements StreamHeaderTrack, MessageEncoder {
+export class StreamHeaderTrackEncoder
+  implements StreamHeaderTrack, MessageEncoder
+{
   constructor(m: StreamHeaderTrack) {
     Object.assign(this, m);
   }
@@ -385,9 +391,12 @@ export interface StreamHeaderTrackObject {
   objectPayload: Uint8Array;
 }
 
-export interface StreamHeaderTrackObjectEncoder extends StreamHeaderTrackObject {};
+export interface StreamHeaderTrackObjectEncoder
+  extends StreamHeaderTrackObject {}
 
-export class StreamHeaderTrackObjectEncoder implements StreamHeaderTrackObject, MessageEncoder {
+export class StreamHeaderTrackObjectEncoder
+  implements StreamHeaderTrackObject, MessageEncoder
+{
   constructor(m: StreamHeaderTrackObject) {
     Object.assign(this, m);
   }
@@ -408,9 +417,11 @@ export interface StreamHeaderGroup {
   objectSendOrder: varint;
 }
 
-export interface StreamHeaderGroupEncoder extends StreamHeaderGroup {};
+export interface StreamHeaderGroupEncoder extends StreamHeaderGroup {}
 
-export class StreamHeaderGroupEncoder implements StreamHeaderGroup, MessageEncoder {
+export class StreamHeaderGroupEncoder
+  implements StreamHeaderGroup, MessageEncoder
+{
   constructor(m: StreamHeaderGroup) {
     Object.assign(this, m);
   }
@@ -429,9 +440,12 @@ export interface StreamHeaderGroupObject {
   objectPayload: Uint8Array;
 }
 
-export interface StreamHeaderGroupObjectEncoder extends StreamHeaderGroupObject {};
+export interface StreamHeaderGroupObjectEncoder
+  extends StreamHeaderGroupObject {}
 
-export class StreamHeaderGroupObjectEncoder implements StreamHeaderGroupObject, MessageEncoder {
+export class StreamHeaderGroupObjectEncoder
+  implements StreamHeaderGroupObject, MessageEncoder
+{
   constructor(m: StreamHeaderGroupObject) {
     Object.assign(this, m);
   }
@@ -448,7 +462,7 @@ export interface Parameter {
   value: Uint8Array;
 }
 
-export interface ParameterEncoder extends Parameter {};
+export interface ParameterEncoder extends Parameter {}
 
 export class ParameterEncoder implements Parameter, MessageEncoder {
   constructor(p: Parameter) {
@@ -467,7 +481,7 @@ export interface Location {
   value: varint;
 }
 
-export interface LocationEncoder extends Location {};
+export interface LocationEncoder extends Location {}
 
 export class LocationEncoder implements Location, MessageEncoder {
   constructor(m: Location) {
