@@ -6,6 +6,9 @@ import { Subscription } from "./subscription";
 import type { Message, ObjectStream } from "./messages";
 import type { varint } from "./varint";
 
+// so that tsup doesn't complain when producing the ts declaration file
+type WebTransportReceiveStream = any;
+
 function base64ToArrayBuffer(base64: string) {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
@@ -48,7 +51,7 @@ export class Session {
     } catch (err) {
       console.log(
         "could not connect WebTransport using serverCertificateHashes, trying wihtout",
-        err,
+        err
       );
       conn = new WebTransport(url);
     }
@@ -60,7 +63,7 @@ export class Session {
 
     const cs = await conn.createBidirectionalStream();
     const decoderStream = new ReadableStream(
-      new ControlStreamDecoder(cs.readable),
+      new ControlStreamDecoder(cs.readable)
     );
     const encoderStream = new WritableStream(new Encoder(cs.writable));
     const controlStream = new ControlStream(decoderStream, encoderStream);
@@ -86,7 +89,7 @@ export class Session {
   async readIncomingUniStream(stream: WebTransportReceiveStream) {
     console.log("got stream");
     const messageStream = new ReadableStream<ObjectStream>(
-      new ObjectStreamDecoder(stream),
+      new ObjectStreamDecoder(stream)
     );
     const reader = messageStream.getReader();
     for (;;) {
@@ -98,12 +101,12 @@ export class Session {
       console.log("got object", value);
       if (!this.subscriptions.has(value.subscribeId)) {
         throw new Error(
-          `got object for unknown subscribeId: ${value.subscribeId}`,
+          `got object for unknown subscribeId: ${value.subscribeId}`
         );
       }
       console.log(
         "writing to subscription",
-        this.subscriptions.get(value.subscribeId),
+        this.subscriptions.get(value.subscribeId)
       );
       const writer = this.subscriptions
         .get(value.subscribeId)!
@@ -136,7 +139,7 @@ export class Session {
         endGroup: { mode: 0, value: 0 },
         endObject: { mode: 0, value: 0 },
         trackRequestParameters: [],
-      }),
+      })
     );
     return s.getReadableStream();
   }

@@ -2,8 +2,12 @@
   "name": "@mengelbart/moqjs",
   "version": "0.0.1",
   "description": "TypeScript implementation of the Media over QUIC (MoQ) transport protocol.",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "lint": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -17,6 +21,8 @@
   },
   "homepage": "https://github.com/mengelbart/moqjs#readme",
   "devDependencies": {
-    "prettier": "^3.3.2"
+    "prettier": "^3.3.2",
+    "tsup": "^8.1.0",
+    "typescript": "^5.4.5"
   }
 }
