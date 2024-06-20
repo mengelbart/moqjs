@@ -40,14 +40,14 @@ class Decoder {
   async read(
     buffer: Uint8Array,
     offset: number,
-    length: number,
+    length: number
   ): Promise<Uint8Array> {
     const reader = this.reader.getReader({ mode: "byob" });
     while (offset < length) {
       const buf = new Uint8Array(
         buffer.buffer,
         buffer.byteOffset + offset,
-        length - offset,
+        length - offset
       );
       const { value, done } = await reader.read(buf);
       if (done) {
@@ -235,7 +235,7 @@ class Decoder {
     const length = await this.readVarint();
     if (length > Number.MAX_VALUE) {
       throw new Error(
-        `cannot read more then ${Number.MAX_VALUE} bytes from stream`,
+        `cannot read more then ${Number.MAX_VALUE} bytes from stream`
       );
     }
     return {
@@ -255,12 +255,18 @@ class Decoder {
     };
   }
 
-  async streamHeaderGroupObject(): Promise<StreamHeaderGroupObject> {
-    const objectId = await this.readVarint();
+  async streamHeaderGroupObject(): Promise<StreamHeaderGroupObject | null> {
+    let objectId;
+    try {
+      // stream can be closed if the peer is done sending all objects
+      objectId = await this.readVarint();
+    } catch (err) {
+      return null;
+    }
     const length = await this.readVarint();
     if (length > Number.MAX_VALUE) {
       throw new Error(
-        `cannot read more then ${Number.MAX_VALUE} bytes from stream`,
+        `cannot read more then ${Number.MAX_VALUE} bytes from stream`
       );
     }
     return {
@@ -273,7 +279,7 @@ class Decoder {
     const length = await this.readVarint();
     if (length > Number.MAX_VALUE) {
       throw new Error(
-        `cannot read more then ${Number.MAX_VALUE} bytes from stream`,
+        `cannot read more then ${Number.MAX_VALUE} bytes from stream`
       );
     }
     const data = await this.readN(<number>length);
@@ -292,7 +298,7 @@ class Decoder {
     const length = await this.readVarint();
     if (length > Number.MAX_VALUE) {
       throw new Error(
-        `cannot read more then ${Number.MAX_VALUE} bytes from stream`,
+        `cannot read more then ${Number.MAX_VALUE} bytes from stream`
       );
     }
     return {
@@ -355,7 +361,7 @@ export class ObjectStreamDecoder extends Decoder {
   }
 
   async pull(
-    controller: ReadableStreamDefaultController<ObjectStream>,
+    controller: ReadableStreamDefaultController<ObjectStream>
   ): Promise<void> {
     if (this.state === EncoderState.TrackStream) {
       const o = await this.streamHeaderTrackObject();
@@ -371,6 +377,10 @@ export class ObjectStreamDecoder extends Decoder {
     }
     if (this.state === EncoderState.GroupStream) {
       const o = await this.streamHeaderGroupObject();
+      if (!o) {
+        controller.close();
+        return;
+      }
       return controller.enqueue({
         type: MessageType.StreamHeaderGroup,
         subscribeId: this.subscribeId!,
