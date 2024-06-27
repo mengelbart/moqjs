@@ -1,11 +1,10 @@
-import { MessageType } from "./messages";
+import { FilterType, MessageType } from "./messages";
+
 import type {
-  ObjectStream,
+  ObjectMsg,
   Subscribe,
-  Location,
-  Parameter,
-  SubscribeError,
   SubscribeOk,
+  SubscribeError,
   Announce,
   AnnounceOk,
   AnnounceError,
@@ -18,6 +17,7 @@ import type {
   StreamHeaderGroup,
   StreamHeaderGroupObject,
   SubscribeDone,
+  Parameter,
 } from "./messages";
 
 type varint = number | bigint;
@@ -107,7 +107,7 @@ class Decoder {
     throw new Error("invalid varint length");
   }
 
-  async objectStream(): Promise<ObjectStream> {
+  async objectStream(): Promise<ObjectMsg> {
     return {
       type: MessageType.ObjectStream,
       subscribeId: await this.readVarint(),
@@ -115,33 +115,61 @@ class Decoder {
       groupId: await this.readVarint(),
       objectId: await this.readVarint(),
       objectSendOrder: await this.readVarint(),
+      objectStatus: await this.readVarint(),
       objectPayload: await this.readAll(),
     };
   }
 
   async subscribe(): Promise<Subscribe> {
+    const subscribeId = await this.readVarint();
+    const trackAlias = await this.readVarint();
+    const trackNamespace = await this.string();
+    const trackName = await this.string();
+    const filterType = await this.readVarint();
+    let startGroup;
+    let startObject;
+    let endGroup;
+    let endObject;
+    if (filterType === FilterType.AbsoluteStart || filterType == FilterType.AbsoluteRange) {
+      startGroup = await this.readVarint();
+      startObject = await this.readVarint();
+    }
+    if (filterType == FilterType.AbsoluteRange) {
+      endGroup = await this.readVarint();
+      endObject = await this.readVarint();
+    }
     return {
       type: MessageType.Subscribe,
-      subscribeId: await this.readVarint(),
-      trackAlias: await this.readVarint(),
-      trackName: await this.string(),
-      trackNamespace: await this.string(),
-      startGroup: await this.location(),
-      startObject: await this.location(),
-      endObject: await this.location(),
-      endGroup: await this.location(),
-      trackRequestParameters: await this.parameters(),
+      subscribeId,
+      trackAlias,
+      trackNamespace,
+      trackName,
+      filterType,
+      startGroup,
+      startObject,
+      endGroup,
+      endObject,
+      subscribeParameters: await this.parameters(),
     };
   }
 
   async subscribeOk(): Promise<SubscribeOk> {
+    const subscribeId = await this.readVarint();
+    const expires = await this.readVarint();
+    const contentExists = (await this.readVarint()) == 1;
+    let finalGroup;
+    let finalObject;
+    if (contentExists) {
+      finalGroup = await this.readVarint();
+      finalObject = await this.readVarint();
+    }
     return {
       type: MessageType.SubscribeOk,
-      subscribeId: await this.readVarint(),
-      expires: await this.readVarint(),
-      contentExists: (await this.readVarint()) == 1,
-      largestGroupID: await this.readVarint(),
-      largestObjectID: await this.readVarint(),
+      subscribeId,
+      expires,
+      contentExists,
+      finalGroup,
+      finalObject,
     };
   }
 
@@ -194,14 +222,24 @@ class Decoder {
   }
 
   async subscribeDone(): Promise<SubscribeDone> {
+    const subscribeId = await this.readVarint();
+    const statusCode = await this.readVarint();
+    const reasonPhrase = await this.string();
+    const contentExists = (await this.readVarint()) == 1;
+    let finalGroup;
+    let finalObject;
+    if (!contentExists) {
+      finalGroup = await this.readVarint();
+      finalObject = await this.readVarint();
+    }
     return {
       type: MessageType.SubscribeDone,
-      subscribeId: await this.readVarint(),
-      statusCode: await this.readVarint(),
-      reasonPhrase: await this.string(),
-      contentExists: (await this.readVarint()) == 1,
-      finalGroup: await this.readVarint(),
-      finalObject: await this.readVarint(),
+      subscribeId,
+      statusCode,
+      reasonPhrase,
+      contentExists,
+      finalGroup,
+      finalObject,
     };
   }
 
@@ -238,9 +276,14 @@ class Decoder {
         `cannot read more then ${Number.MAX_VALUE} bytes from stream`
       );
     }
+    let objectStatus;
+    if (length === 0) {
+      objectStatus = await this.readVarint();
+    }
     return {
-      groupId: groupId,
-      objectId: objectId,
+      groupId,
+      objectId,
+      objectStatus,
       objectPayload: await this.readN(<number>length),
     };
   }
@@ -269,8 +312,13 @@ class Decoder {
         `cannot read more then ${Number.MAX_VALUE} bytes from stream`
       );
     }
+    let objectStatus;
+    if (length === 0) {
+      objectStatus = await this.readVarint();
+    }
     return {
       objectId: objectId,
+      objectStatus,
       objectPayload: await this.readN(<number>length),
     };
   }
@@ -284,13 +332,6 @@ class Decoder {
     }
     const data = await this.readN(<number>length);
     return new TextDecoder().decode(data);
-  }
-
-  async location(): Promise<Location> {
-    return {
-      mode: await this.readVarint(),
-      value: await this.readVarint(),
-    };
   }
 
   async parameter(): Promise<Parameter> {
@@ -361,7 +402,7 @@ export class ObjectStreamDecoder extends Decoder {
   }
 
   async pull(
-    controller: ReadableStreamDefaultController<ObjectStream>
+    controller: ReadableStreamDefaultController<ObjectMsg>
   ): Promise<void> {
     if (this.state === EncoderState.TrackStream) {
       const o = await this.streamHeaderTrackObject();
@@ -372,6 +413,7 @@ export class ObjectStreamDecoder extends Decoder {
         groupId: o.groupId,
         objectId: o.objectId,
         objectSendOrder: this.objectSendOrder!,
+        objectStatus: 0,
         objectPayload: o.objectPayload,
       });
     }
@@ -388,6 +430,7 @@ export class ObjectStreamDecoder extends Decoder {
         groupId: this.groupId!,
         objectId: o.objectId,
         objectSendOrder: this.objectSendOrder!,
+        objectStatus: 0,
         objectPayload: o.objectPayload,
       });
     }
@@ -414,6 +457,7 @@ export class ObjectStreamDecoder extends Decoder {
         groupId: o.groupId,
         objectId: o.objectId,
         objectSendOrder: this.objectSendOrder!,
+        objectStatus: 0,
         objectPayload: o.objectPayload,
       });
     }
@@ -426,6 +470,9 @@ export class ObjectStreamDecoder extends Decoder {
       this.groupId = header.groupId;
       this.objectSendOrder = header.objectSendOrder;
       const o = await this.streamHeaderGroupObject();
+      if (!o) {
+        return;
+      }
       return controller.enqueue({
         type: MessageType.StreamHeaderGroup,
         subscribeId: this.subscribeId!,
@@ -433,6 +480,7 @@ export class ObjectStreamDecoder extends Decoder {
         groupId: this.groupId!,
         objectId: o.objectId,
         objectSendOrder: this.objectSendOrder!,
+        objectStatus: 0,
         objectPayload: o.objectPayload,
       });
     }

@@ -1,4 +1,4 @@
-import type { Message, ObjectStream } from "./messages";
+import type { Message, ObjectMsg } from "./messages";
 import type { varint } from "./varint";
 
 export class Subscription {
@@ -18,7 +18,7 @@ export class Subscription {
     });
     this.subscription = new TransformStream({
       transform: (
-        chunk: ObjectStream,
+        chunk: ObjectMsg,
         controller: TransformStreamDefaultController<Uint8Array>,
       ) => {
         controller.enqueue(chunk.objectPayload);
