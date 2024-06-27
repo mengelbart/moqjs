@@ -3,7 +3,8 @@ import type { varint } from "./varint";
 export const DRAFT_IETF_MOQ_TRANSPORT_01 = 0xff000001;
 export const DRAFT_IETF_MOQ_TRANSPORT_02 = 0xff000002;
 export const DRAFT_IETF_MOQ_TRANSPORT_03 = 0xff000003;
-export const CURRENT_SUPPORTED_DRAFT = DRAFT_IETF_MOQ_TRANSPORT_03;
+export const DRAFT_IETF_MOQ_TRANSPORT_04 = 0xff000004;
+export const CURRENT_SUPPORTED_DRAFT = DRAFT_IETF_MOQ_TRANSPORT_04;
 
 export interface MessageEncoder {
   encode(e: Encoder): Promise<void>;
@@ -18,6 +19,7 @@ interface Encoder {
 export enum MessageType {
   ObjectStream = 0x00,
   ObjectDatagram = 0x01,
+  SubscribeUpdate = 0x02,
   Subscribe = 0x03,
   SubscribeOk = 0x04,
   SubscribeError = 0x05,
@@ -27,27 +29,26 @@ export enum MessageType {
   Unannounce = 0x09,
   Unsubscribe = 0x0a,
   SubscribeDone = 0x0b,
+  AnnounceCancel = 0x0c,
   GoAway = 0x10,
   ClientSetup = 0x40,
   ServerSetup = 0x41,
   StreamHeaderTrack = 0x50,
   StreamHeaderGroup = 0x51,
-
-  // TODO: Update when draft has added a value
-  AnnounceCancel = 0x11,
 }
 
 export type Message =
-  | ObjectStream
+  | ObjectMsg
+  | SubscribeUpdate
   | Subscribe
   | SubscribeOk
   | SubscribeError
-  | Unsubscribe
-  | SubscribeDone
   | Announce
   | AnnounceOk
   | AnnounceError
   | Unannounce
+  | Unsubscribe
+  | SubscribeDone
   | AnnounceCancel
   | GoAway
   | ClientSetup
@@ -55,7 +56,7 @@ export type Message =
   | StreamHeaderTrack
   | StreamHeaderGroup;
 
-export interface ObjectStream {
+export interface ObjectMsg {
   type:
     | MessageType.ObjectStream
     | MessageType.ObjectDatagram
@@ -66,13 +67,14 @@ export interface ObjectStream {
   groupId: varint;
   objectId: varint;
   objectSendOrder: varint;
+  objectStatus: varint;
   objectPayload: Uint8Array;
 }
 
-export interface ObjectStreamEncoder extends ObjectStream {}
+export interface ObjectStreamEncoder extends ObjectMsg {}
 
-export class ObjectStreamEncoder implements ObjectStream, MessageEncoder {
-  constructor(m: ObjectStream) {
+export class ObjectStreamEncoder implements ObjectMsg, MessageEncoder {
+  constructor(m: ObjectMsg) {
     Object.assign(this, m);
   }
 
@@ -81,17 +83,25 @@ export class ObjectStreamEncoder implements ObjectStream, MessageEncoder {
   }
 }
 
+export enum FilterType {
+  LatestGroup = 0x01,
+  LatestObject = 0x02,
+  AbsoluteStart = 0x03,
+  AbsoluteRange = 0x04,
+}
+
 export interface Subscribe {
   type: MessageType.Subscribe;
   subscribeId: varint;
   trackAlias: varint;
   trackNamespace: string;
   trackName: string;
-  startGroup: Location;
-  startObject: Location;
-  endGroup: Location;
-  endObject: Location;
-  trackRequestParameters: Parameter[];
+  filterType: varint;
+  startGroup?: varint;
+  startObject?: varint;
+  endGroup?: varint;
+  endObject?: varint;
+  subscribeParameters: Parameter[];
 }
 
 export interface SubscribeEncoder extends Subscribe {}
@@ -107,12 +117,51 @@ export class SubscribeEncoder implements Subscribe, MessageEncoder {
     await e.writeVarint(this.trackAlias);
     await e.writeString(this.trackNamespace);
     await e.writeString(this.trackName);
-    await new LocationEncoder(this.startGroup).encode(e);
-    await new LocationEncoder(this.startObject).encode(e);
-    await new LocationEncoder(this.endGroup).encode(e);
-    await new LocationEncoder(this.endObject).encode(e);
-    await e.writeVarint(this.trackRequestParameters.length);
-    for (const p of this.trackRequestParameters) {
+    await e.writeVarint(this.filterType);
+    if (
+      this.filterType === FilterType.AbsoluteStart ||
+      this.filterType === FilterType.AbsoluteRange
+    ) {
+      await e.writeVarint(this.startGroup || 0);
+      await e.writeVarint(this.startObject || 0);
+    }
+    if (this.filterType === FilterType.AbsoluteRange) {
+      await e.writeVarint(this.endGroup || 0);
+      await e.writeVarint(this.endObject || 0);
+    }
+    await e.writeVarint(this.subscribeParameters.length);
+    for (const p of this.subscribeParameters) {
+      await new ParameterEncoder(p).encode(e);
+    }
+  }
+}
+
+export interface SubscribeUpdate {
+  type: MessageType.SubscribeUpdate;
+  subscribeId: varint;
+  startGroup: varint;
+  startObject: varint;
+  endGroup: varint;
+  endObject: varint;
+  subscribeParameters: Parameter[];
+}
+
+export interface SubscribeUpdateEncoder extends SubscribeUpdate {}
+
+export class SubscribeUpdateEncoder implements SubscribeUpdate, MessageEncoder {
+  constructor(m: SubscribeUpdate) {
+    Object.assign(this, m);
+  }
+
+  async encode(e: Encoder): Promise<void> {
+    await e.writeVarint(this.type);
+    await e.writeVarint(this.subscribeId);
+    await e.writeVarint(this.startGroup);
+    await e.writeVarint(this.startObject);
+    await e.writeVarint(this.endGroup);
+    await e.writeVarint(this.endObject);
+    await e.writeVarint(this.subscribeParameters.length);
+    for (const p of this.subscribeParameters) {
       await new ParameterEncoder(p).encode(e);
     }
   }
@@ -123,8 +172,8 @@ export interface SubscribeOk {
   subscribeId: varint;
   expires: varint;
   contentExists: boolean;
-  largestGroupID?: varint;
-  largestObjectID?: varint;
+  finalGroup?: varint;
+  finalObject?: varint;
 }
 
 export interface SubscribeOkEncoder extends SubscribeOk {}
@@ -140,8 +189,8 @@ export class SubscribeOkEncoder implements SubscribeOk, MessageEncoder {
     await e.writeVarint(this.expires);
     await e.writeVarint(this.contentExists ? 1 : 0); // TODO: Should use byte instead of varint?
     if (this.contentExists) {
-      await e.writeVarint(this.largestGroupID!);
-      await e.writeVarint(this.largestObjectID!);
+      await e.writeVarint(this.finalGroup!);
+      await e.writeVarint(this.finalObject!);
     }
   }
 }
@@ -194,8 +243,8 @@ export interface SubscribeDone {
   statusCode: varint;
   reasonPhrase: string;
   contentExists: boolean;
-  finalGroup: varint;
-  finalObject: varint;
+  finalGroup?: varint;
+  finalObject?: varint;
 }
 
 export interface SubscribeDoneEncoder extends SubscribeDone {}
@@ -212,8 +261,8 @@ export class SubscribeDoneEncoder implements SubscribeDone, MessageEncoder {
     await e.writeString(this.reasonPhrase);
     await e.writeVarint(this.contentExists ? 1 : 0); // TODO: Should use byte instead of varint?
     if (this.contentExists) {
-      await e.writeVarint(this.finalGroup);
-      await e.writeVarint(this.finalObject);
+      await e.writeVarint(this.finalGroup || 0);
+      await e.writeVarint(this.finalObject || 0);
     }
   }
 }
@@ -388,6 +437,7 @@ export class StreamHeaderTrackEncoder
 export interface StreamHeaderTrackObject {
   groupId: varint;
   objectId: varint;
+  objectStatus?: varint;
   objectPayload: Uint8Array;
 }
 
@@ -405,7 +455,11 @@ export class StreamHeaderTrackObjectEncoder
     await e.writeVarint(this.groupId);
     await e.writeVarint(this.objectId);
     await e.writeVarint(this.objectPayload.byteLength);
-    await e.writeBytes(this.objectPayload);
+    if (this.objectPayload.byteLength === 0) {
+      await e.writeVarint(this.objectStatus || 0);
+    } else {
+      await e.writeBytes(this.objectPayload);
+    }
   }
 }
 
@@ -437,6 +491,7 @@ export class StreamHeaderGroupEncoder
 
 export interface StreamHeaderGroupObject {
   objectId: varint;
+  objectStatus?: varint;
   objectPayload: Uint8Array;
 }
 
@@ -453,7 +508,11 @@ export class StreamHeaderGroupObjectEncoder
   async encode(e: Encoder): Promise<void> {
     await e.writeVarint(this.objectId);
     await e.writeVarint(this.objectPayload.byteLength);
-    await e.writeBytes(this.objectPayload);
+    if (this.objectPayload.byteLength === 0) {
+      await e.writeVarint(this.objectStatus || 0);
+    } else {
+      await e.writeBytes(this.objectPayload);
+    }
   }
 }
 
@@ -473,25 +532,5 @@ export class ParameterEncoder implements Parameter, MessageEncoder {
     await e.writeVarint(this.type);
     await e.writeVarint(this.value.byteLength);
     await e.writeBytes(this.value);
-  }
-}
-
-export interface Location {
-  mode: varint;
-  value: varint;
-}
-
-export interface LocationEncoder extends Location {}
-
-export class LocationEncoder implements Location, MessageEncoder {
-  constructor(m: Location) {
-    Object.assign(this, m);
-  }
-
-  async encode(e: Encoder): Promise<void> {
-    await e.writeVarint(this.mode);
-    if (this.mode !== 0) {
-      await e.writeVarint(this.value);
-    }
   }
 }

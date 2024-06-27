@@ -1,9 +1,9 @@
 import { ControlStream } from "./control_stream";
 import { ControlStreamDecoder, ObjectStreamDecoder } from "./decoder";
 import { Encoder } from "./encoder";
-import { MessageType, SubscribeEncoder } from "./messages";
+import { FilterType, MessageType, SubscribeEncoder } from "./messages";
 import { Subscription } from "./subscription";
-import type { Message, ObjectStream } from "./messages";
+import type { Message, ObjectMsg } from "./messages";
 import type { varint } from "./varint";
 
 // so that tsup doesn't complain when producing the ts declaration file
@@ -81,14 +81,14 @@ export class Session {
       if (done) {
         break;
       }
-      await this.readIncomingUniStream(value);
+      this.readIncomingUniStream(value);
     }
   }
 
   // @ts-ignore
   async readIncomingUniStream(stream: WebTransportReceiveStream) {
     console.log("got stream");
-    const messageStream = new ReadableStream<ObjectStream>(
+    const messageStream = new ReadableStream<ObjectMsg>(
       new ObjectStreamDecoder(stream)
     );
     const reader = messageStream.getReader();
@@ -117,7 +117,6 @@ export class Session {
   }
 
   async handle(m: Message) {
-    console.log("onmessage", m);
     switch (m.type) {
       case MessageType.SubscribeOk:
         this.subscriptions.get(m.subscribeId)?.subscribeOk();
@@ -134,11 +133,8 @@ export class Session {
         trackAlias: 0,
         trackNamespace: namespace,
         trackName: track,
-        startGroup: { mode: 0, value: 0 },
-        startObject: { mode: 0, value: 0 },
-        endGroup: { mode: 0, value: 0 },
-        endObject: { mode: 0, value: 0 },
-        trackRequestParameters: [],
+        filterType: FilterType.LatestGroup,
+        subscribeParameters: [],
       })
     );
     return s.getReadableStream();
