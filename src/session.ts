@@ -22,6 +22,7 @@ export class Session {
   conn: WebTransport;
   controlStream: ControlStream;
   subscriptions: Map<varint, Subscription>;
+  nextSubscribeId: number = 0;
 
   constructor(conn: WebTransport, cs: ControlStream) {
     this.subscriptions = new Map<varint, Subscription>();
@@ -98,16 +99,16 @@ export class Session {
         console.log("stream closed");
         break;
       }
-      console.log("got object", value);
+      // console.log("got object", value);
       if (!this.subscriptions.has(value.subscribeId)) {
         throw new Error(
           `got object for unknown subscribeId: ${value.subscribeId}`
         );
       }
-      console.log(
-        "writing to subscription",
-        this.subscriptions.get(value.subscribeId)
-      );
+      // console.log(
+      //   "writing to subscription",
+      //   this.subscriptions.get(value.subscribeId)
+      // );
       const writer = this.subscriptions
         .get(value.subscribeId)!
         .subscription.writable.getWriter();
@@ -124,13 +125,14 @@ export class Session {
   }
 
   async subscribe(namespace: string, track: string): Promise<ReadableStream> {
-    const s = new Subscription(0);
-    this.subscriptions.set(0, s);
+    const subId = this.nextSubscribeId++;
+    const s = new Subscription(subId);
+    this.subscriptions.set(subId, s);
     await this.controlStream.send(
       new SubscribeEncoder({
         type: MessageType.Subscribe,
-        subscribeId: 0,
-        trackAlias: 0,
+        subscribeId: subId,
+        trackAlias: subId,
         trackNamespace: namespace,
         trackName: track,
         filterType: FilterType.LatestGroup,
