@@ -1,7 +1,12 @@
 import { ControlStream } from "./control_stream";
 import { ControlStreamDecoder, ObjectStreamDecoder } from "./decoder";
 import { Encoder } from "./encoder";
-import { FilterType, MessageType, SubscribeEncoder } from "./messages";
+import {
+  FilterType,
+  MessageType,
+  SubscribeEncoder,
+  UnsubscribeEncoder,
+} from "./messages";
 import { Subscription } from "./subscription";
 import type { Message, ObjectMsg } from "./messages";
 import type { varint } from "./varint";
@@ -124,7 +129,10 @@ export class Session {
     }
   }
 
-  async subscribe(namespace: string, track: string): Promise<ReadableStream> {
+  async subscribe(
+    namespace: string,
+    track: string
+  ): Promise<{ subscribeId: number; readableStream: ReadableStream }> {
     const subId = this.nextSubscribeId++;
     const s = new Subscription(subId);
     this.subscriptions.set(subId, s);
@@ -139,6 +147,19 @@ export class Session {
         subscribeParameters: [],
       })
     );
-    return s.getReadableStream();
+    const readableStream = await s.getReadableStream();
+    return {
+      subscribeId: subId,
+      readableStream,
+    };
+  }
+
+  async unsubscribe(subscribeId: number) {
+    this.controlStream.send(
+      new UnsubscribeEncoder({
+        type: MessageType.Unsubscribe,
+        subscribeId: subscribeId,
+      })
+    );
   }
 }
