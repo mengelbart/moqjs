@@ -228,7 +228,7 @@ class Decoder {
     const contentExists = (await this.readVarint()) == 1;
     let finalGroup;
     let finalObject;
-    if (!contentExists) {
+    if (contentExists) {
       finalGroup = await this.readVarint();
       finalObject = await this.readVarint();
     }
