@@ -135,13 +135,22 @@ class Decoder {
   }
 
   async subscribeOk(): Promise<SubscribeOk> {
+    const subscribeId = await this.readVarint();
+    const expires = await this.readVarint();
+    const contentExists = (await this.readVarint()) == 1;
+    let largestGroupID;
+    let largestObjectID;
+    if (contentExists) {
+      largestGroupID = await this.readVarint();
+      largestObjectID = await this.readVarint();
+    }
     return {
       type: MessageType.SubscribeOk,
-      subscribeId: await this.readVarint(),
-      expires: await this.readVarint(),
-      contentExists: (await this.readVarint()) == 1,
-      largestGroupID: await this.readVarint(),
-      largestObjectID: await this.readVarint(),
+      subscribeId,
+      expires,
+      contentExists,
+      largestGroupID,
+      largestObjectID,
     };
   }
 
