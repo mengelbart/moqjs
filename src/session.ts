@@ -3,7 +3,7 @@ import { ControlStreamDecoder, ObjectStreamDecoder } from "./decoder";
 import { Encoder } from "./encoder";
 import { MessageType, SubscribeEncoder, UnsubscribeEncoder } from "./messages";
 import { Subscription } from "./subscription";
-import type { Message, ObjectStream } from "./messages";
+import type { Message, ObjectStream, Location } from "./messages";
 import type { varint } from "./varint";
 
 // so that tsup doesn't complain when producing the ts declaration file
@@ -127,7 +127,11 @@ export class Session {
 
   async subscribe(
     namespace: string,
-    track: string
+    track: string,
+    startGroup: Location = { mode: 0, value: 0 },
+    startObject: Location = { mode: 0, value: 0 },
+    endGroup: Location = { mode: 0, value: 0 },
+    endObject: Location = { mode: 0, value: 0 }
   ): Promise<{ subscribeId: number; readableStream: ReadableStream }> {
     const subId = this.nextSubscribeId++;
     const s = new Subscription(subId);
@@ -139,10 +143,10 @@ export class Session {
         trackAlias: subId,
         trackNamespace: namespace,
         trackName: track,
-        startGroup: { mode: 0, value: 0 },
-        startObject: { mode: 0, value: 0 },
-        endGroup: { mode: 0, value: 0 },
-        endObject: { mode: 0, value: 0 },
+        startGroup,
+        startObject,
+        endGroup,
+        endObject,
         trackRequestParameters: [],
       })
     );
