@@ -37,28 +37,31 @@ export class Session {
     cs.onmessage = this.handle.bind(this);
 
     this.controlStream.runReadLoop();
-    this.readIncmoingUnidirectionalStreams(this.conn);
+    this.readIncomingUnidirectionalStreams(this.conn);
   }
 
-  static async connect(url: string, serverCertificateHash: string) {
+  static async connect(url: string, serverCertificateHash?: string) {
     console.log("connecting WebTransport");
-    let conn: WebTransport;
-    try {
-      const certHashes = [
-        {
-          algorithm: "sha-256",
-          value: base64ToArrayBuffer(serverCertificateHash),
-        },
-      ];
-      console.log("hashes", certHashes);
-      console.log("url", url);
-      conn = new WebTransport(url, { serverCertificateHashes: certHashes });
-      // conn = new WebTransport(url);
-    } catch (err) {
-      console.log(
-        "could not connect WebTransport using serverCertificateHashes, trying wihtout",
-        err
-      );
+    let conn: WebTransport | null = null;
+    if (serverCertificateHash !== undefined) {
+      try {
+        const certHashes = [
+          {
+            algorithm: "sha-256",
+            value: base64ToArrayBuffer(serverCertificateHash),
+          },
+        ];
+        console.log("hashes", certHashes);
+        console.log("url", url);
+        conn = new WebTransport(url, { serverCertificateHashes: certHashes });
+      } catch (err) {
+        console.log(
+          "could not connect WebTransport using serverCertificateHashes",
+          err,
+        );
+      }
+    } else {
+      console.log("connecting without serverCertificateHashes");
       conn = new WebTransport(url);
     }
     if (!conn) {
@@ -69,7 +72,7 @@ export class Session {
 
     const cs = await conn.createBidirectionalStream();
     const decoderStream = new ReadableStream(
-      new ControlStreamDecoder(cs.readable)
+      new ControlStreamDecoder(cs.readable),
     );
     const encoderStream = new WritableStream(new Encoder(cs.writable));
     const controlStream = new ControlStream(decoderStream, encoderStream);
@@ -78,7 +81,7 @@ export class Session {
     return new Session(conn, controlStream);
   }
 
-  async readIncmoingUnidirectionalStreams(conn: WebTransport) {
+  async readIncomingUnidirectionalStreams(conn: WebTransport) {
     console.log("reading incoming streams");
     const uds = conn.incomingUnidirectionalStreams;
     const reader = uds.getReader();
@@ -95,7 +98,7 @@ export class Session {
   async readIncomingUniStream(stream: WebTransportReceiveStream) {
     console.log("got stream");
     const messageStream = new ReadableStream<ObjectMsg>(
-      new ObjectStreamDecoder(stream)
+      new ObjectStreamDecoder(stream),
     );
     const reader = messageStream.getReader();
     for (;;) {
@@ -107,7 +110,7 @@ export class Session {
       // console.log("got object", value);
       if (!this.subscriptions.has(value.subscribeId)) {
         throw new Error(
-          `got object for unknown subscribeId: ${value.subscribeId}`
+          `got object for unknown subscribeId: ${value.subscribeId}`,
         );
       }
       // console.log(
@@ -131,7 +134,7 @@ export class Session {
 
   async subscribe(
     namespace: string,
-    track: string
+    track: string,
   ): Promise<{ subscribeId: number; readableStream: ReadableStream }> {
     const subId = this.nextSubscribeId++;
     const s = new Subscription(subId);
@@ -145,7 +148,7 @@ export class Session {
         trackName: track,
         filterType: FilterType.LatestGroup,
         subscribeParameters: [],
-      })
+      }),
     );
     const readableStream = await s.getReadableStream();
     return {
@@ -159,7 +162,7 @@ export class Session {
       new UnsubscribeEncoder({
         type: MessageType.Unsubscribe,
         subscribeId: subscribeId,
-      })
+      }),
     );
   }
 }
