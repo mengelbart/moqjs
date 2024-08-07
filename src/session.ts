@@ -42,9 +42,9 @@ export class Session {
 
   static async connect(url: string, serverCertificateHash?: string) {
     console.log("connecting WebTransport");
-    let conn: WebTransport | null = null;
-    if (serverCertificateHash !== undefined) {
-      try {
+    let conn: WebTransport;
+    try {
+      if (serverCertificateHash !== undefined) {
         const certHashes = [
           {
             algorithm: "sha-256",
@@ -54,18 +54,12 @@ export class Session {
         console.log("hashes", certHashes);
         console.log("url", url);
         conn = new WebTransport(url, { serverCertificateHashes: certHashes });
-      } catch (err) {
-        console.log(
-          "could not connect WebTransport using serverCertificateHashes",
-          err,
-        );
+      } else {
+        console.log("connecting without serverCertificateHashes");
+        conn = new WebTransport(url);
       }
-    } else {
-      console.log("connecting without serverCertificateHashes");
-      conn = new WebTransport(url);
-    }
-    if (!conn) {
-      throw new Error("failed to connect MoQ session");
+    } catch (error) {
+      throw new Error(`failed to connect MoQ session: ${error}`);
     }
     await conn.ready;
     console.log("WebTransport connection ready");
