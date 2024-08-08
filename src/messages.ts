@@ -79,8 +79,40 @@ export class ObjectStreamEncoder implements ObjectMsg, MessageEncoder {
     Object.assign(this, m);
   }
 
-  async encode(_: Encoder): Promise<void> {
-    throw Error("not implemented");
+  async encode(e: Encoder): Promise<void> {
+    if (this.type === MessageType.ObjectStream || this.type === MessageType.ObjectDatagram) {
+      await e.writeVarint(this.type);
+      await e.writeVarint(this.subscribeId);
+      await e.writeVarint(this.trackAlias);
+      await e.writeVarint(this.groupId);
+      await e.writeVarint(this.objectId);
+      await e.writeBytes(new Uint8Array([this.publisherPriority]));
+      await e.writeVarint(this.objectStatus);
+      await e.writeBytes(this.objectPayload);
+      return;
+    }
+    if (this.type === MessageType.StreamHeaderTrack) {
+      await e.writeVarint(this.groupId);
+      await e.writeVarint(this.objectId);
+      await e.writeVarint(this.objectPayload.length);
+      if (this.objectPayload.length === 0) {
+        await e.writeVarint(this.objectStatus);
+        return;
+      }
+      await e.writeBytes(this.objectPayload);
+      return;
+    }
+    if (this.type === MessageType.StreamHeaderGroup) {
+      await e.writeVarint(this.objectId);
+      await e.writeVarint(this.objectPayload.length);
+      if (this.objectPayload.length === 0) {
+        await e.writeVarint(this.objectStatus);
+        return;
+      }
+      await e.writeBytes(this.objectPayload);
+      return;
+    }
+    throw new Error(`cannot encode unknown message type ${this.type}`);
   }
 }
 
