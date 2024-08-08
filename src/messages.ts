@@ -4,7 +4,8 @@ export const DRAFT_IETF_MOQ_TRANSPORT_01 = 0xff000001;
 export const DRAFT_IETF_MOQ_TRANSPORT_02 = 0xff000002;
 export const DRAFT_IETF_MOQ_TRANSPORT_03 = 0xff000003;
 export const DRAFT_IETF_MOQ_TRANSPORT_04 = 0xff000004;
-export const CURRENT_SUPPORTED_DRAFT = DRAFT_IETF_MOQ_TRANSPORT_04;
+export const DRAFT_IETF_MOQ_TRANSPORT_05 = 0xff000005;
+export const CURRENT_SUPPORTED_DRAFT = DRAFT_IETF_MOQ_TRANSPORT_05;
 
 export interface MessageEncoder {
   encode(e: Encoder): Promise<void>;
@@ -66,7 +67,7 @@ export interface ObjectMsg {
   trackAlias: varint;
   groupId: varint;
   objectId: varint;
-  objectSendOrder: varint;
+  publisherPriority: number;
   objectStatus: varint;
   objectPayload: Uint8Array;
 }
@@ -96,6 +97,8 @@ export interface Subscribe {
   trackAlias: varint;
   trackNamespace: string;
   trackName: string;
+  subscriberPriority: number;
+  groupOrder: number;
   filterType: varint;
   startGroup?: varint;
   startObject?: varint;
@@ -117,6 +120,8 @@ export class SubscribeEncoder implements Subscribe, MessageEncoder {
     await e.writeVarint(this.trackAlias);
     await e.writeString(this.trackNamespace);
     await e.writeString(this.trackName);
+    await e.writeBytes(new Uint8Array([this.subscriberPriority]));
+    await e.writeBytes(new Uint8Array([this.groupOrder]));
     await e.writeVarint(this.filterType);
     if (
       this.filterType === FilterType.AbsoluteStart ||
@@ -143,6 +148,7 @@ export interface SubscribeUpdate {
   startObject: varint;
   endGroup: varint;
   endObject: varint;
+  subscriberPriority: number;
   subscribeParameters: Parameter[];
 }
 
@@ -160,6 +166,7 @@ export class SubscribeUpdateEncoder implements SubscribeUpdate, MessageEncoder {
     await e.writeVarint(this.startObject);
     await e.writeVarint(this.endGroup);
     await e.writeVarint(this.endObject);
+    await e.writeBytes(new Uint8Array([this.subscriberPriority]));
     await e.writeVarint(this.subscribeParameters.length);
     for (const p of this.subscribeParameters) {
       await new ParameterEncoder(p).encode(e);
@@ -171,6 +178,7 @@ export interface SubscribeOk {
   type: MessageType.SubscribeOk;
   subscribeId: varint;
   expires: varint;
+  groupOrder: number;
   contentExists: boolean;
   finalGroup?: varint;
   finalObject?: varint;
@@ -187,6 +195,7 @@ export class SubscribeOkEncoder implements SubscribeOk, MessageEncoder {
     await e.writeVarint(this.type);
     await e.writeVarint(this.subscribeId);
     await e.writeVarint(this.expires);
+    await e.writeBytes(new Uint8Array([this.groupOrder]));
     await e.writeVarint(this.contentExists ? 1 : 0); // TODO: Should use byte instead of varint?
     if (this.contentExists) {
       await e.writeVarint(this.finalGroup!);
@@ -414,7 +423,7 @@ export interface StreamHeaderTrack {
   type: MessageType.StreamHeaderTrack;
   subscribeId: varint;
   trackAlias: varint;
-  objectSendOrder: varint;
+  publisherPriority: number;
 }
 
 export interface StreamHeaderTrackEncoder extends StreamHeaderTrack {}
@@ -430,7 +439,7 @@ export class StreamHeaderTrackEncoder
     await e.writeVarint(this.type);
     await e.writeVarint(this.subscribeId);
     await e.writeVarint(this.trackAlias);
-    await e.writeVarint(this.objectSendOrder);
+    await e.writeBytes(new Uint8Array([this.publisherPriority]));
   }
 }
 
@@ -468,7 +477,7 @@ export interface StreamHeaderGroup {
   subscribeId: varint;
   trackAlias: varint;
   groupId: varint;
-  objectSendOrder: varint;
+  publisherPriority: number;
 }
 
 export interface StreamHeaderGroupEncoder extends StreamHeaderGroup {}
@@ -485,7 +494,7 @@ export class StreamHeaderGroupEncoder
     await e.writeVarint(this.subscribeId);
     await e.writeVarint(this.trackAlias);
     await e.writeVarint(this.groupId);
-    await e.writeVarint(this.objectSendOrder);
+    await e.writeBytes(new Uint8Array([this.publisherPriority]));
   }
 }
 

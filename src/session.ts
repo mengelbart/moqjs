@@ -140,6 +140,8 @@ export class Session {
         trackAlias: subId,
         trackNamespace: namespace,
         trackName: track,
+        subscriberPriority: 0,
+        groupOrder: 1,
         filterType: FilterType.LatestGroup,
         subscribeParameters: [],
       }),
