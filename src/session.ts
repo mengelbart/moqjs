@@ -6,6 +6,7 @@ import {
   MessageType,
   SubscribeEncoder,
   UnsubscribeEncoder,
+  ObjectStreamEncoder,
 } from "./messages";
 import { Subscription } from "./subscription";
 import type { Message, ObjectMsg } from "./messages";
@@ -117,6 +118,24 @@ export class Session {
       await writer.write(value);
       writer.releaseLock();
     }
+  }
+
+  async writeObjUniStream(subscribeId: number, trackAlias: number, groupId: number, objectId: number, publisherPriority: number, objectStatus: number, objectPayload: Uint8Array) {
+    const objectStream = await this.conn.createUnidirectionalStream();
+    const writer = objectStream.getWriter();
+    await writer.write(
+      new ObjectStreamEncoder({
+        type: MessageType.ObjectStream,
+        subscribeId: subscribeId,
+        trackAlias: trackAlias,
+        groupId: groupId,
+        objectId: objectId,
+        publisherPriority: publisherPriority,
+        objectStatus: objectStatus,
+        objectPayload: objectPayload,
+      }),
+    );
+    await objectStream.close();
   }
 
   async handle(m: Message) {
