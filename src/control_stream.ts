@@ -23,25 +23,18 @@ export class ControlStream {
       CURRENT_SUPPORTED_DRAFT.toString(16),
     );
 
-    const writer = this.writer.getWriter();
-
     try {
-      await writer.write(
-        new ClientSetupEncoder({
-          type: MessageType.ClientSetup,
-          versions: [CURRENT_SUPPORTED_DRAFT],
-          parameters: [
-            new ParameterEncoder({ type: 0, value: new Uint8Array([0x2]) }),
-          ],
-        }),
-      );
+      const m = new ClientSetupEncoder({
+        type: MessageType.ClientSetup,
+        versions: [CURRENT_SUPPORTED_DRAFT],
+        parameters: [
+          new ParameterEncoder({ type: 0, value: new Uint8Array([0x2]) }),
+        ],
+      });
+      await this.send(m);
       console.log("ClientSetup msg sent");
     } catch (error) {
       console.log("failed to send ClientSetup msg: ", error);
-      writer.releaseLock();
-      return;
-    } finally {
-      writer.releaseLock();
     }
 
     const reader = this.reader.getReader();
