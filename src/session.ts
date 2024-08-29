@@ -4,8 +4,13 @@ import { Encoder } from "./encoder";
 import {
   FilterType,
   MessageType,
+  AnnounceEncoder,
+  AnnounceOkEncoder,
   SubscribeEncoder,
+  SubscribeOkEncoder,
+  SubscribeErrorEncoder,
   UnsubscribeEncoder,
+  SubscribeDoneEncoder,
   ObjectStreamEncoder,
 } from "./messages";
 import { Subscription } from "./subscription";
@@ -29,6 +34,8 @@ export class Session {
   controlStream: ControlStream;
   subscriptions: Map<varint, Subscription>;
   nextSubscribeId: number = 0;
+
+  private _canWrite: boolean = false; // flag for publisher session
 
   constructor(conn: WebTransport, cs: ControlStream) {
     this.subscriptions = new Map<varint, Subscription>();
@@ -77,7 +84,7 @@ export class Session {
   }
 
   async readIncomingUnidirectionalStreams(conn: WebTransport) {
-    console.log("reading incoming streams");
+    console.log("reading incoming obj streams");
     const uds = conn.incomingUnidirectionalStreams;
     const reader = uds.getReader();
     while (true) {
@@ -120,29 +127,31 @@ export class Session {
     }
   }
 
-  async writeObjUniStream(subscribeId: number, trackAlias: number, groupId: number, objectId: number, publisherPriority: number, objectStatus: number, objectPayload: Uint8Array) {
-    const objectStream = await this.conn.createUnidirectionalStream();
-    const writer = objectStream.getWriter();
-    await writer.write(
-      new ObjectStreamEncoder({
-        type: MessageType.ObjectStream,
-        subscribeId: subscribeId,
-        trackAlias: trackAlias,
-        groupId: groupId,
-        objectId: objectId,
-        publisherPriority: publisherPriority,
-        objectStatus: objectStatus,
-        objectPayload: objectPayload,
-      }),
-    );
-    await objectStream.close();
-  }
-
   async handle(m: Message) {
     switch (m.type) {
       case MessageType.SubscribeOk:
         this.subscriptions.get(m.subscribeId)?.subscribeOk();
     }
+  }
+
+  async announce(namespace: string) {
+    await this.controlStream.send(
+      new AnnounceEncoder({
+        type: MessageType.Announce,
+        namespace: namespace,
+        parameters: [],
+      }),
+    );
+    this._canWrite = true;
+  }
+
+  async announceOk(namespace: string) {
+    await this.controlStream.send(
+      new AnnounceOkEncoder({
+        type: MessageType.AnnounceOk,
+        trackNamespace: namespace,
+      }),
+    );
   }
 
   async subscribe(
@@ -172,6 +181,40 @@ export class Session {
     };
   }
 
+  async subscribeOk(
+    subscribeId: number,
+    expires: number,
+    groupOrder: number,
+    contentExists: boolean,
+  ) {
+    await this.controlStream.send(
+      new SubscribeOkEncoder({
+        type: MessageType.SubscribeOk,
+        subscribeId: subscribeId,
+        expires: expires,
+        groupOrder: groupOrder,
+        contentExists: contentExists,
+      }),
+    );
+  }
+
+  async subscribeError(
+    subscribeId: number,
+    errorCode: number,
+    reasonPhrase: string,
+    trackAlias: number,
+  ) {
+    await this.controlStream.send(
+      new SubscribeErrorEncoder({
+        type: MessageType.SubscribeError,
+        subscribeId: subscribeId,
+        errorCode: errorCode,
+        reasonPhrase: reasonPhrase,
+        trackAlias: trackAlias,
+      }),
+    );
+  }
+
   async unsubscribe(subscribeId: number) {
     this.controlStream.send(
       new UnsubscribeEncoder({
@@ -179,5 +222,55 @@ export class Session {
         subscribeId: subscribeId,
       }),
     );
+  }
+
+  async subscribeDone(
+    subscribeId: number,
+    statusCode: number,
+    reasonPhrase: string,
+    contentExists: boolean,
+    finalGroup?: number,
+    finalObject?: number,
+  ) {
+    this.controlStream.send(
+      new SubscribeDoneEncoder({
+        type: MessageType.SubscribeDone,
+        subscribeId: subscribeId,
+        statusCode: statusCode,
+        reasonPhrase: reasonPhrase,
+        contentExists: contentExists,
+        finalGroup: finalGroup,
+        finalObject: finalObject,
+      }),
+    );
+  }
+
+  async writeObjUniStream(
+    subscribeId: number,
+    trackAlias: number,
+    groupId: number,
+    objectId: number,
+    publisherPriority: number,
+    objectStatus: number,
+    objectPayload: Uint8Array,
+  ) {
+    if (!this._canWrite) {
+      throw new Error("only publisher can write to stream");
+    }
+    const objectStream = await this.conn.createUnidirectionalStream();
+    const writer = objectStream.getWriter();
+    await writer.write(
+      new ObjectStreamEncoder({
+        type: MessageType.ObjectStream,
+        subscribeId: subscribeId,
+        trackAlias: trackAlias,
+        groupId: groupId,
+        objectId: objectId,
+        publisherPriority: publisherPriority,
+        objectStatus: objectStatus,
+        objectPayload: objectPayload,
+      }),
+    );
+    await objectStream.close();
   }
 }
