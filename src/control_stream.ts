@@ -66,7 +66,6 @@ export class ControlStream {
           break;
         }
         if (this.onmessage) {
-          console.log("control stream msg received in runReadLoop: ", value);
           this.onmessage(value);
         }
       }
