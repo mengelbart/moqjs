@@ -261,10 +261,21 @@ export class Session {
     if (!this._canWrite) {
       throw new Error("only publisher can write to stream");
     }
-    const objectStream = await this.conn.createUnidirectionalStream();
-    const writer = objectStream.getWriter();
-    await writer.write(
-      new ObjectStreamEncoder({
+    try {
+      const objectStream = await this.conn.createUnidirectionalStream();
+
+      const encoderStream = new WritableStream<Uint8Array>({
+        async write(chunk) {
+          const writer = objectStream.getWriter();
+          await writer.write(chunk);
+          console.log("object written to stream");
+          writer.releaseLock();
+        },
+      });
+
+      const encoder = new Encoder(encoderStream);
+
+      const objStreamEncoder = new ObjectStreamEncoder({
         type: MessageType.ObjectStream,
         subscribeId: subscribeId,
         trackAlias: trackAlias,
@@ -273,8 +284,13 @@ export class Session {
         publisherPriority: publisherPriority,
         objectStatus: objectStatus,
         objectPayload: objectPayload,
-      }),
-    );
-    await objectStream.close();
+      });
+
+      await objStreamEncoder.encode(encoder);
+
+      await objectStream.close();
+    } catch (err) {
+      console.log("failed to write obj: ", err);
+    }
   }
 }
