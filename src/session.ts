@@ -35,8 +35,6 @@ export class Session {
   subscriptions: Map<varint, Subscription>;
   nextSubscribeId: number = 0;
 
-  private _canWrite: boolean = false; // flag for publisher session
-
   constructor(conn: WebTransport, cs: ControlStream) {
     this.subscriptions = new Map<varint, Subscription>();
 
@@ -142,7 +140,6 @@ export class Session {
         parameters: [],
       }),
     );
-    this._canWrite = true;
   }
 
   async announceOk(namespace: string) {
@@ -181,6 +178,7 @@ export class Session {
     };
   }
 
+  // return a function that can be used to write obj msgs on the subscription, aka: writeObjUniStream()
   async subscribeOk(
     subscribeId: number,
     expires: number,
@@ -200,6 +198,41 @@ export class Session {
         finalObject: finalObject,
       }),
     );
+    return async (
+      subscribeId: number,
+      trackAlias: number,
+      groupId: number,
+      objectId: number,
+      publisherPriority: number,
+      objectStatus: number,
+      objectPayload: Uint8Array,
+    ) => {
+      try {
+        const objectStream = await this.conn.createUnidirectionalStream();
+        const encoderStream = new WritableStream<Uint8Array>({
+          async write(chunk) {
+            const writer = objectStream.getWriter();
+            await writer.write(chunk);
+            writer.releaseLock();
+          },
+        });
+        const encoder = new Encoder(encoderStream);
+        const objStreamEncoder = new ObjectStreamEncoder({
+          type: MessageType.ObjectStream,
+          subscribeId: subscribeId,
+          trackAlias: trackAlias,
+          groupId: groupId,
+          objectId: objectId,
+          publisherPriority: publisherPriority,
+          objectStatus: objectStatus,
+          objectPayload: objectPayload,
+        });
+        await objStreamEncoder.encode(encoder);
+        await objectStream.close();
+      } catch (err) {
+        console.log("failed to write obj: ", err);
+      }
+    };
   }
 
   async subscribeError(
@@ -247,49 +280,5 @@ export class Session {
         finalObject: finalObject,
       }),
     );
-  }
-
-  async writeObjUniStream(
-    subscribeId: number,
-    trackAlias: number,
-    groupId: number,
-    objectId: number,
-    publisherPriority: number,
-    objectStatus: number,
-    objectPayload: Uint8Array,
-  ) {
-    if (!this._canWrite) {
-      throw new Error("only publisher can write to stream");
-    }
-    try {
-      const objectStream = await this.conn.createUnidirectionalStream();
-
-      const encoderStream = new WritableStream<Uint8Array>({
-        async write(chunk) {
-          const writer = objectStream.getWriter();
-          await writer.write(chunk);
-          writer.releaseLock();
-        },
-      });
-
-      const encoder = new Encoder(encoderStream);
-
-      const objStreamEncoder = new ObjectStreamEncoder({
-        type: MessageType.ObjectStream,
-        subscribeId: subscribeId,
-        trackAlias: trackAlias,
-        groupId: groupId,
-        objectId: objectId,
-        publisherPriority: publisherPriority,
-        objectStatus: objectStatus,
-        objectPayload: objectPayload,
-      });
-
-      await objStreamEncoder.encode(encoder);
-
-      await objectStream.close();
-    } catch (err) {
-      console.log("failed to write obj: ", err);
-    }
   }
 }
