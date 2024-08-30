@@ -268,7 +268,6 @@ export class Session {
         async write(chunk) {
           const writer = objectStream.getWriter();
           await writer.write(chunk);
-          console.log("object written to stream");
           writer.releaseLock();
         },
       });
