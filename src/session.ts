@@ -186,6 +186,8 @@ export class Session {
     expires: number,
     groupOrder: number,
     contentExists: boolean,
+    finalGroup?: number,
+    finalObject?: number,
   ) {
     await this.controlStream.send(
       new SubscribeOkEncoder({
@@ -194,6 +196,8 @@ export class Session {
         expires: expires,
         groupOrder: groupOrder,
         contentExists: contentExists,
+        finalGroup: finalGroup,
+        finalObject: finalObject,
       }),
     );
   }
