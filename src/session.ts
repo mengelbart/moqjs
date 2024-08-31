@@ -6,6 +6,7 @@ import {
   MessageType,
   AnnounceEncoder,
   AnnounceOkEncoder,
+  UnannounceEncoder,
   SubscribeEncoder,
   SubscribeOkEncoder,
   SubscribeErrorEncoder,
@@ -138,6 +139,15 @@ export class Session {
         type: MessageType.Announce,
         namespace: namespace,
         parameters: [],
+      }),
+    );
+  }
+
+  async unannounce(namespace: string) {
+    await this.controlStream.send(
+      new UnannounceEncoder({
+        type: MessageType.Unannounce,
+        trackNamespace: namespace,
       }),
     );
   }
