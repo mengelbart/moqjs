@@ -9,7 +9,7 @@ import type { Message, MessageEncoder } from "./messages";
 export class ControlStream {
   reader: ReadableStream<Message>;
   writer: WritableStream<MessageEncoder>;
-  onmessage?: (m: Message) => void; // leave cs msg handling to dev
+  onmessage?: (m: Message) => {};
 
   constructor(r: ReadableStream<Message>, w: WritableStream<MessageEncoder>) {
     this.reader = r;
