@@ -10,12 +10,13 @@ import {
   SubscribeEncoder,
   SubscribeOkEncoder,
   SubscribeErrorEncoder,
+  SubscribeUpdateEncoder,
   UnsubscribeEncoder,
   SubscribeDoneEncoder,
   ObjectStreamEncoder,
 } from "./messages";
 import { Subscription } from "./subscription";
-import type { Message, ObjectMsg } from "./messages";
+import type { Message, ObjectMsg, Parameter } from "./messages";
 import type { varint } from "./varint";
 
 // so that tsup doesn't complain when producing the ts declaration file
@@ -258,6 +259,30 @@ export class Session {
         errorCode: errorCode,
         reasonPhrase: reasonPhrase,
         trackAlias: trackAlias,
+      }),
+    );
+  }
+
+  //! moqtransport TODO
+  async subscribeUpdate(
+    subscribeId: number,
+    startGroup: number,
+    startObject: number,
+    endGroup: number,
+    endObject: number,
+    subscriberPriority: number,
+    subscribeParameters: Parameter[],
+  ) {
+    await this.controlStream.send(
+      new SubscribeUpdateEncoder({
+        type: MessageType.SubscribeUpdate,
+        subscribeId: subscribeId,
+        startGroup: startGroup,
+        startObject: startObject,
+        endGroup: endGroup,
+        endObject: endObject,
+        subscriberPriority: subscriberPriority,
+        subscribeParameters: subscribeParameters,
       }),
     );
   }
