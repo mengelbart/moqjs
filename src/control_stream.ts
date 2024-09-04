@@ -35,6 +35,7 @@ export class ControlStream {
       console.log("ClientSetup msg sent");
     } catch (error) {
       console.log("failed to send ClientSetup msg: ", error);
+      return;
     }
 
     const reader = this.reader.getReader();
@@ -49,6 +50,7 @@ export class ControlStream {
       console.log("handshake msg received: ", value);
     } catch (error) {
       console.log("failed to read handshake msg: ", error);
+      return;
     } finally {
       // TODO: Evaluate server setup message?
       reader.releaseLock();
