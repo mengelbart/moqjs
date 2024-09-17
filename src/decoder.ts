@@ -470,7 +470,7 @@ export class ObjectStreamDecoder extends Decoder {
     }
 
     const mt = await this.readVarint();
-    console.log("decoding message type", mt);
+    // console.log("decoding message type", mt);
 
     if (mt === MessageType.ObjectStream) {
       controller.enqueue(await this.objectStream());

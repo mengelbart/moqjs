@@ -98,7 +98,7 @@ export class Session {
 
   // @ts-ignore
   async readIncomingUniStream(stream: WebTransportReceiveStream) {
-    console.log("got stream");
+    // console.log("got stream");
     const messageStream = new ReadableStream<ObjectMsg>(
       new ObjectStreamDecoder(stream),
     );
@@ -106,7 +106,7 @@ export class Session {
     for (;;) {
       const { value, done } = await reader.read();
       if (done) {
-        console.log("stream closed");
+        // console.log("stream closed");
         break;
       }
       // console.log("got object", value);
