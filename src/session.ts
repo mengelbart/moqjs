@@ -4,11 +4,19 @@ import { Encoder } from "./encoder";
 import {
   FilterType,
   MessageType,
+  AnnounceEncoder,
+  AnnounceOkEncoder,
+  UnannounceEncoder,
   SubscribeEncoder,
+  SubscribeOkEncoder,
+  SubscribeErrorEncoder,
+  SubscribeUpdateEncoder,
   UnsubscribeEncoder,
+  SubscribeDoneEncoder,
+  ObjectStreamEncoder,
 } from "./messages";
 import { Subscription } from "./subscription";
-import type { Message, ObjectMsg } from "./messages";
+import type { Message, ObjectMsg, Parameter } from "./messages";
 import type { varint } from "./varint";
 
 // so that tsup doesn't complain when producing the ts declaration file
@@ -76,7 +84,7 @@ export class Session {
   }
 
   async readIncomingUnidirectionalStreams(conn: WebTransport) {
-    console.log("reading incoming streams");
+    console.log("reading incoming obj streams");
     const uds = conn.incomingUnidirectionalStreams;
     const reader = uds.getReader();
     while (true) {
@@ -90,7 +98,7 @@ export class Session {
 
   // @ts-ignore
   async readIncomingUniStream(stream: WebTransportReceiveStream) {
-    console.log("got stream");
+    // console.log("got stream");
     const messageStream = new ReadableStream<ObjectMsg>(
       new ObjectStreamDecoder(stream),
     );
@@ -98,7 +106,7 @@ export class Session {
     for (;;) {
       const { value, done } = await reader.read();
       if (done) {
-        console.log("stream closed");
+        // console.log("stream closed");
         break;
       }
       // console.log("got object", value);
@@ -124,6 +132,35 @@ export class Session {
       case MessageType.SubscribeOk:
         this.subscriptions.get(m.subscribeId)?.subscribeOk();
     }
+  }
+
+  async announce(namespace: string) {
+    await this.controlStream.send(
+      new AnnounceEncoder({
+        type: MessageType.Announce,
+        namespace: namespace,
+        parameters: [],
+      }),
+    );
+  }
+
+  //! moqtransport TODO
+  async unannounce(namespace: string) {
+    await this.controlStream.send(
+      new UnannounceEncoder({
+        type: MessageType.Unannounce,
+        trackNamespace: namespace,
+      }),
+    );
+  }
+
+  async announceOk(namespace: string) {
+    await this.controlStream.send(
+      new AnnounceOkEncoder({
+        type: MessageType.AnnounceOk,
+        trackNamespace: namespace,
+      }),
+    );
   }
 
   async subscribe(
@@ -153,11 +190,130 @@ export class Session {
     };
   }
 
+  // return a function that can be used to write obj msgs on the subscription, aka: writeObjUniStream()
+  async subscribeOk(
+    subscribeId: number,
+    expires: number,
+    groupOrder: number,
+    contentExists: boolean,
+    finalGroup?: number,
+    finalObject?: number,
+  ) {
+    await this.controlStream.send(
+      new SubscribeOkEncoder({
+        type: MessageType.SubscribeOk,
+        subscribeId: subscribeId,
+        expires: expires,
+        groupOrder: groupOrder,
+        contentExists: contentExists,
+        finalGroup: finalGroup,
+        finalObject: finalObject,
+      }),
+    );
+    return async (
+      subscribeId: number,
+      trackAlias: number,
+      groupId: number,
+      objectId: number,
+      publisherPriority: number,
+      objectStatus: number,
+      objectPayload: Uint8Array,
+    ) => {
+      try {
+        const objectStream = await this.conn.createUnidirectionalStream();
+        const encoderStream = new WritableStream<Uint8Array>({
+          async write(chunk) {
+            const writer = objectStream.getWriter();
+            await writer.write(chunk);
+            writer.releaseLock();
+          },
+        });
+        const encoder = new Encoder(encoderStream);
+        const objStreamEncoder = new ObjectStreamEncoder({
+          type: MessageType.ObjectStream,
+          subscribeId: subscribeId,
+          trackAlias: trackAlias,
+          groupId: groupId,
+          objectId: objectId,
+          publisherPriority: publisherPriority,
+          objectStatus: objectStatus,
+          objectPayload: objectPayload,
+        });
+        await objStreamEncoder.encode(encoder);
+        await objectStream.close();
+      } catch (err) {
+        console.log("failed to write obj: ", err);
+      }
+    };
+  }
+
+  async subscribeError(
+    subscribeId: number,
+    errorCode: number,
+    reasonPhrase: string,
+    trackAlias: number,
+  ) {
+    await this.controlStream.send(
+      new SubscribeErrorEncoder({
+        type: MessageType.SubscribeError,
+        subscribeId: subscribeId,
+        errorCode: errorCode,
+        reasonPhrase: reasonPhrase,
+        trackAlias: trackAlias,
+      }),
+    );
+  }
+
+  //! moqtransport TODO
+  async subscribeUpdate(
+    subscribeId: number,
+    startGroup: number,
+    startObject: number,
+    endGroup: number,
+    endObject: number,
+    subscriberPriority: number,
+    subscribeParameters: Parameter[],
+  ) {
+    await this.controlStream.send(
+      new SubscribeUpdateEncoder({
+        type: MessageType.SubscribeUpdate,
+        subscribeId: subscribeId,
+        startGroup: startGroup,
+        startObject: startObject,
+        endGroup: endGroup,
+        endObject: endObject,
+        subscriberPriority: subscriberPriority,
+        subscribeParameters: subscribeParameters,
+      }),
+    );
+  }
+
   async unsubscribe(subscribeId: number) {
     this.controlStream.send(
       new UnsubscribeEncoder({
         type: MessageType.Unsubscribe,
         subscribeId: subscribeId,
+      }),
+    );
+  }
+
+  async subscribeDone(
+    subscribeId: number,
+    statusCode: number,
+    reasonPhrase: string,
+    contentExists: boolean,
+    finalGroup?: number,
+    finalObject?: number,
+  ) {
+    this.controlStream.send(
+      new SubscribeDoneEncoder({
+        type: MessageType.SubscribeDone,
+        subscribeId: subscribeId,
+        statusCode: statusCode,
+        reasonPhrase: reasonPhrase,
+        contentExists: contentExists,
+        finalGroup: finalGroup,
+        finalObject: finalObject,
       }),
     );
   }
