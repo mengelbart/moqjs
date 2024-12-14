@@ -218,16 +218,17 @@ export class Session {
       publisherPriority: number,
       objectStatus: number,
       objectPayload: Uint8Array,
+      encoderStream: WritableStream<Uint8Array>,
     ) => {
       try {
-        const objectStream = await this.conn.createUnidirectionalStream();
-        const encoderStream = new WritableStream<Uint8Array>({
-          async write(chunk) {
-            const writer = objectStream.getWriter();
-            await writer.write(chunk);
-            writer.releaseLock();
-          },
-        });
+        // const objectStream = await this.conn.createUnidirectionalStream();
+        // const encoderStream = new WritableStream<Uint8Array>({
+        //   async write(chunk) {
+        //     const writer = objectStream.getWriter();
+        //     await writer.write(chunk);
+        //     writer.releaseLock();
+        //   },
+        // });
         const encoder = new Encoder(encoderStream);
         const objStreamEncoder = new ObjectStreamEncoder({
           type: MessageType.ObjectStream,
@@ -240,7 +241,7 @@ export class Session {
           objectPayload: objectPayload,
         });
         await objStreamEncoder.encode(encoder);
-        await objectStream.close();
+        // await objectStream.close();
       } catch (err) {
         console.log("failed to write obj: ", err);
       }
